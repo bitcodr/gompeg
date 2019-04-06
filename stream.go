@@ -2,11 +2,12 @@ package gompeg
 
 import (
 	"github.com/fatih/structs"
+	"os/exec"
 	"reflect"
 	"strings"
 )
 
-func (m *Media) Build() []string {
+func (m *Media) Build() error {
 	var commands []string
 	fields := structs.Names(m)
 	for _, v := range fields {
@@ -18,5 +19,9 @@ func (m *Media) Build() []string {
 			}
 		}
 	}
-	return commands
+	err := exec.Command("ffmpeg", commands...).Run()
+	if err != nil {
+		return err
+	}
+	return nil
 }

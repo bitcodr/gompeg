@@ -7,6 +7,7 @@ import (
 )
 
 type Media struct {
+	inputPath             string
 	aspect                string
 	resolution            string
 	videoBitRate          int
@@ -26,11 +27,10 @@ type Media struct {
 	bufferSize            int
 	preset                string
 	quality               int
-	inputPath             string
-	outputPath            string
 	outputFormat          string
 	nativeFramerateInput  bool
 	pixelFormat           string
+	outputPath            string
 	//threads               int
 	//tune                  string
 	//audioProfile          string
@@ -167,8 +167,7 @@ func (m *Media) SetQuality(v int) {
 	m.quality = v
 }
 
-
-func (m *Media) SetOutputPath(v string){
+func (m *Media) SetOutputPath(v string) {
 	m.outputPath = v
 }
 
@@ -254,16 +253,13 @@ func (m *Media) AudioBitrate() []string {
 	return nil
 }
 
-func (m *Media) NativeFramerateInput() []string {
-	if m.nativeFramerateInput {
-		return []string{"-re"}
-	}
-	return nil
-}
-
 func (m *Media) InputPath() []string {
 	if m.inputPath != "" {
-		return []string{"-i", m.inputPath}
+		if m.nativeFramerateInput {
+			return []string{"-re", "-i", m.inputPath}
+		} else {
+			return []string{"-i", m.inputPath}
+		}
 	}
 	return nil
 }
@@ -324,13 +320,9 @@ func (m *Media) Quality() []string {
 	return nil
 }
 
-func (m *Media) OutputPath() []string{
-	if m.outputPath !=""{
+func (m *Media) OutputPath() []string {
+	if m.outputPath != "" {
 		return []string{m.outputPath}
 	}
 	return nil
 }
-
-
-
-
