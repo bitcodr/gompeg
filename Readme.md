@@ -8,7 +8,7 @@ How to use:
             package main
             
             import (
-            	"github.com/amiraliio/gompeg"
+            	"github.com/bitcodr/gompeg"
             	"log"
             )
             
