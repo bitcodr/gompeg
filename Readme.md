@@ -4,7 +4,8 @@ Simple And Productive Go FFMPEG Wrapper
 
 
 How to use:
-    
+
+```go
             package main
             
             import (
