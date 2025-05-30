@@ -35,8 +35,7 @@ jobs:
           choco install ffmpeg --yes
       # Run tests and collect coverage
       - name: Test & Coverage
-        run: |
-          go test -v -coverprofile=coverage.out ./...
+        run: go test -v "-coverprofile=coverage.out" ./...
       # Upload coverage to Codecov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
