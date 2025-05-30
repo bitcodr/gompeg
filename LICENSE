@@ -1,0 +1,161 @@
+package gompeg
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os/exec"
+	"strings"
+)
+
+// Command builds and runs an ffmpeg invocation.
+// Use New() or preset helpers (e.g., HLS()).
+// All exported methods return the same pointer for fluent chaining.
+
+type Command struct {
+	ffmpegPath string
+
+	// basic config
+	inputs  []string
+	outputs []string
+
+	// flags
+	videoCodec   string
+	audioCodec   string
+	videoBitrate string
+	audioBitrate string
+	preset       string
+	format       string
+
+	// mux
+	seek     string
+	vframes  int
+	realTime bool
+	noVideo  bool
+	noAudio  bool
+
+	// piping + logs
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
+
+	// extra raw args
+	extra []string
+}
+
+// New returns a fresh Command and checks ffmpeg availability.
+func New() *Command {
+	path, _ := exec.LookPath("ffmpeg") // ignore error; handled on Run()
+	return &Command{ffmpegPath: path}
+}
+
+// convenience presets
+func HLS() *Command { return New().Format("hls") }
+
+// chainable setters (selection)
+func (c *Command) Input(path string) *Command      { c.inputs = append(c.inputs, path); return c }
+func (c *Command) Output(path string) *Command     { c.outputs = append(c.outputs, path); return c }
+func (c *Command) Format(f string) *Command        { c.format = f; return c }
+func (c *Command) VideoCodec(v string) *Command    { c.videoCodec = v; return c }
+func (c *Command) AudioCodec(a string) *Command    { c.audioCodec = a; return c }
+func (c *Command) VideoBitrate(k int) *Command     { c.videoBitrate = fmt.Sprintf("%dk", k); return c }
+func (c *Command) AudioBitrate(k int) *Command     { c.audioBitrate = fmt.Sprintf("%dk", k); return c }
+func (c *Command) Preset(p string) *Command        { c.preset = p; return c }
+func (c *Command) Seek(ts string) *Command         { c.seek = ts; return c }
+func (c *Command) VFrames(n int) *Command          { c.vframes = n; return c }
+func (c *Command) RealTime() *Command              { c.realTime = true; return c }
+func (c *Command) NoVideo() *Command               { c.noVideo = true; return c }
+func (c *Command) NoAudio() *Command               { c.noAudio = true; return c }
+func (c *Command) PipeInput(r io.Reader) *Command  { c.stdin = r; return c }
+func (c *Command) PipeOutput(w io.Writer) *Command { c.stdout = w; return c }
+func (c *Command) Logs(w io.Writer) *Command       { c.stderr = w; return c }
+func (c *Command) Extra(args ...string) *Command   { c.extra = append(c.extra, args...); return c }
+
+// BuildArgs converts the struct into ffmpeg CLI arguments.
+func (c *Command) BuildArgs() ([]string, error) {
+	if len(c.inputs) == 0 {
+		return nil, errors.New("no input specified")
+	}
+	if len(c.outputs) == 0 {
+		return nil, errors.New("no output specified")
+	}
+	var args []string
+	if c.realTime {
+		args = append(args, "-re")
+	}
+	for _, in := range c.inputs {
+		args = append(args, "-i", in)
+	}
+	if c.seek != "" {
+		args = append(args, "-ss", c.seek)
+	}
+	if c.noVideo {
+		args = append(args, "-vn")
+	}
+	if c.noAudio {
+		args = append(args, "-an")
+	}
+	if c.videoCodec != "" {
+		args = append(args, "-c:v", c.videoCodec)
+	}
+	if c.audioCodec != "" {
+		args = append(args, "-c:a", c.audioCodec)
+	}
+	if c.videoBitrate != "" {
+		args = append(args, "-b:v", c.videoBitrate)
+	}
+	if c.audioBitrate != "" {
+		args = append(args, "-b:a", c.audioBitrate)
+	}
+	if c.preset != "" {
+		args = append(args, "-preset", c.preset)
+	}
+	if c.vframes > 0 {
+		args = append(args, "-frames:v", fmt.Sprint(c.vframes))
+	}
+	if c.format != "" {
+		args = append(args, "-f", c.format)
+	}
+	// append extras before outputs
+	args = append(args, c.extra...)
+	args = append(args, c.outputs...)
+	return args, nil
+}
+
+// String returns the full command for logging / debugging.
+func (c *Command) String() string {
+	a, err := c.BuildArgs()
+	if err != nil {
+		return "<invalid command>"
+	}
+	return "ffmpeg " + strings.Join(a, " ")
+}
+
+// Run executes the command; use RunWithContext for cancellation.
+func (c *Command) Run() error { return c.RunWithContext(context.Background()) }
+
+func (c *Command) RunWithContext(ctx context.Context) error {
+	if c.ffmpegPath == "" {
+		return errors.New("ffmpeg binary not found in PATH; please install or SetPath")
+	}
+	args, err := c.BuildArgs()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.CommandContext(ctx, c.ffmpegPath, args...)
+	cmd.Stdin = c.stdin
+	if c.stdout != nil {
+		cmd.Stdout = c.stdout
+	}
+	if c.stderr != nil {
+		cmd.Stderr = c.stderr
+	}
+	return cmd.Run()
+}
+
+// SetPath globally overrides the ffmpeg binary location.
+func SetPath(p string) { defaultPath = p }
+
+var defaultPath string

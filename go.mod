@@ -1,5 +1,3 @@
-module github.com/amiraliio/gompeg
+module github.com/bitcodr/gompeg
 
-go 1.12
-
-require github.com/fatih/structs v1.1.0
+go 1.21
